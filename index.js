@@ -4,32 +4,18 @@ const abbreviations = states.abbreviations;
 const fullNames = states.fullNames;
 const stateMappings = states.mappings;
 
+const abbrRegex = getAbbreviationRegex(abbreviations);
+const fullRegex = getFullNameRegex(fullNames);
+const stateRegex = abbrRegex.concat(fullRegex);
+
 /**
  * Finds all cities in a string and returns them as an array of objects with city and state properties.
  * @param {String} str The string to find cities in.
  * @return {Object[]} The found cities. Objects will have city and state properties.
  */
 function findCities(str) {
-    // Find all state abbreviations (CO, Co, C.O., C.o.). Example regex: /, ?C\.?[Oo][\. ]/
-    const abbrRegex = abbreviations.map(abbreviation => {
-        const prefix = ', ?';
-        const first = abbreviation.charAt(0).toUpperCase();
-        const second = '[' + abbreviation.charAt(1).toUpperCase() + abbreviation.charAt(1).toLowerCase() + ']';
-        const regex = prefix + first + '\\.?' + second + '[\\. ]';
-        return new RegExp(regex, 'g');
-    });
-
-    // Find all written state names and abbreviations (California, Calif.). Example regex: /, ?Cal[^ ]*/
-    const fullRegex = fullNames.map(value => {
-        const prefix = ', ?';
-        const word = value.substring(0, 3);
-        const regex = prefix + word + '[^ ]*';
-        return new RegExp(regex, 'g');
-    });
-
     // Find state matches
     const matches = [];
-    const stateRegex = abbrRegex.concat(fullRegex);
     stateRegex.forEach(regex => {
         const match = regex.exec(str);
 
@@ -38,7 +24,48 @@ function findCities(str) {
         }
     });
 
-    // Look for consecutive proper nouns before each state which identifies the city's name
+    let cities = getCitiesInString(str, matches);
+    cities = normalizeStates(cities);
+
+    return cities;
+}
+
+/**
+ * Find all state abbreviations (CO, Co, C.O., C.o.). Example regex: /, ?C\.?[Oo][\. ]/
+ * @param {String[]} abbreviations The state abbreviations.
+ * @return {RegExp[]} The regular expressions for state abbreviations.
+ */
+function getAbbreviationRegex(abbreviations) {
+    return abbreviations.map(abbreviation => {
+        const prefix = ', ?';
+        const first = abbreviation.charAt(0).toUpperCase();
+        const second = '[' + abbreviation.charAt(1).toUpperCase() + abbreviation.charAt(1).toLowerCase() + ']';
+        const regex = prefix + first + '\\.?' + second + '[\\. ]';
+        return new RegExp(regex, 'g');
+    });
+}
+
+/**
+ * Find all written state names and abbreviations (California, Calif.). Example regex: /, ?Cal[^ ]* /
+ * @param {String[]} fullNames The full names of each state.
+ * @return {RegExp[]} The regular expressions for the states' full names.
+ */
+function getFullNameRegex(fullNames) {
+    return fullNames.map(value => {
+        const prefix = ', ?';
+        const word = value.substring(0, 3);
+        const regex = prefix + word + '[^ ]*';
+        return new RegExp(regex, 'g');
+    });
+}
+
+/**
+ * Look for consecutive proper nouns before each state which identifies the city's name.
+ * @param {String} str The string to search within.
+ * @param {Object[]} matches The matches to find cities for. Must be generated from RegExp.exec().
+ * @return {Object[]} The cities found. Each object has city and state properties.
+ */
+function getCitiesInString(str, matches) {
     const cities = [];
     matches.forEach(match => {
         const index = match.index;
@@ -61,7 +88,18 @@ function findCities(str) {
         });
     });
 
-    // Make each state uniform and remove punctuation
+    return cities;
+}
+
+/**
+ * Remove punctuation and convert each state to two-letter code.
+ * @param {Object[]} cities Each object has city and state properties.
+ * @return {Object[]} Objects with city and state properties. States are in two-letter format.
+ */
+function normalizeStates(cities) {
+    // Make a duplicate array to not modify original
+    cities = cities.concat([]);
+
     cities.forEach(city => {
         // Remove punctuation and leading/trailing whitespace
         city.state = city.state.replace(/[^A-Za-z ]/g, '').trim();
